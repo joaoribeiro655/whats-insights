@@ -27,7 +27,7 @@ services:
       INGEST_SECRET: ${INGEST_SECRET}
       DATA_DIR: /app/data
       DEVICE_NAME: ${DEVICE_NAME:-Insights}
-      SYNC_FULL_HISTORY: ${SYNC_FULL_HISTORY:-false}
+      SYNC_FULL_HISTORY: ${SYNC_FULL_HISTORY:-true}
       LOG_LEVEL: info
     volumes:
       - gateway-sessions:/app/data   # sessões do WhatsApp: sem isso, todo deploy pede QR de novo
@@ -48,6 +48,7 @@ services:
       APP_SECRET: ${APP_SECRET}
       DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD}
       ANALYZE_EVERY_MINUTES: ${ANALYZE_EVERY_MINUTES:-10}
+      ANALYZE_MAX_AGE_DAYS: ${ANALYZE_MAX_AGE_DAYS:-180}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-opus-5-5}
       ANALYZE_INACTIVITY_MINUTES: ${ANALYZE_INACTIVITY_MINUTES:-120}

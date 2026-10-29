@@ -1,5 +1,5 @@
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { and, asc, eq, lt, sql as dsql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, lt, sql as dsql } from "drizzle-orm";
 import { z } from "zod";
 import { contacts, conversationInsights, conversations, db, messages, organizations, sellers } from "@/db";
 import { env } from "./env";
@@ -135,10 +135,12 @@ export async function runAnalysisBatch(opts: { limit?: number; inactivityMinutes
   const inactivity = opts.inactivityMinutes ?? env.analyzeInactivityMinutes;
   const concurrency = opts.concurrency ?? 3;
   const cutoff = new Date(Date.now() - inactivity * 60_000);
+  const maxAge = env.analyzeMaxAgeDays;
+  const oldest = maxAge > 0 ? new Date(Date.now() - maxAge * 86_400_000) : null;
 
   const pending = await db.select({ id: conversations.id }).from(conversations)
-    .where(and(eq(conversations.needsAnalysis, true), lt(conversations.lastMessageAt, cutoff), dsql`${conversations.inboundCount} > 0`))
-    .orderBy(asc(conversations.lastMessageAt)).limit(limit);
+    .where(and(eq(conversations.needsAnalysis, true), lt(conversations.lastMessageAt, cutoff), dsql`${conversations.inboundCount} > 0`, oldest ? gt(conversations.lastMessageAt, oldest) : undefined))
+    .orderBy(desc(conversations.lastMessageAt)).limit(limit);
 
   const results: { id: string; ok: boolean; error?: string }[] = [];
   let idx = 0;

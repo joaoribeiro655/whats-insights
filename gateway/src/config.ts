@@ -18,7 +18,7 @@ export const config = {
   dataDir: path.resolve(process.env.DATA_DIR ?? './data'),
   /** Nome exibido em "Dispositivos conectados" no celular do vendedor. */
   deviceName: process.env.DEVICE_NAME ?? 'Insights',
-  /** Sincroniza o histórico completo na primeira conexão (pesado, mas dá base histórica). */
-  syncFullHistory: (process.env.SYNC_FULL_HISTORY ?? 'false') === 'true',
+  /** Pede o histórico completo no pareamento (igual ao WhatsApp Web no desktop). Sem isso o WhatsApp manda só as conversas recentes. */
+  syncFullHistory: (process.env.SYNC_FULL_HISTORY ?? 'true') !== 'false',
   logLevel: process.env.LOG_LEVEL ?? 'info',
 };

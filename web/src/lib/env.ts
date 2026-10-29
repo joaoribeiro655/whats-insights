@@ -15,6 +15,8 @@ export const env = {
   get anthropicModel() { return process.env.ANTHROPIC_MODEL ?? "claude-opus-5-5"; },
   /** minutos sem mensagem nova pra considerar a conversa "assentada" e analisar */
   get analyzeInactivityMinutes() { return Number(process.env.ANALYZE_INACTIVITY_MINUTES ?? 120); },
+  /** não analisa conversas cuja última mensagem é mais antiga que isso (dias). 0 = sem limite */
+  get analyzeMaxAgeDays() { return Number(process.env.ANALYZE_MAX_AGE_DAYS ?? 180); },
   /** quantas conversas por rodada do job */
   get analyzeBatchSize() { return Number(process.env.ANALYZE_BATCH_SIZE ?? 20); },
   /** minutos com lead esperando resposta pra marcar como "parada" */

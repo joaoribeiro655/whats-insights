@@ -36,7 +36,7 @@ ETAPA 3. Serviço gateway
   INGEST_SECRET=<segredo 2>
   INGEST_URL=http://web.railway.internal:3000/api/ingest
   DEVICE_NAME=<nome da minha empresa, me pergunte>
-  SYNC_FULL_HISTORY=false
+  SYNC_FULL_HISTORY=true
   LOG_LEVEL=info
   NODE_ENV=production
 - Faça o deploy e confira nos logs a linha "gateway no ar (somente leitura)".
@@ -58,6 +58,7 @@ ETAPA 4. Serviço web
   DASHBOARD_PASSWORD=<senha forte que você vai me entregar>
   ANALYZE_EVERY_MINUTES=10
   ANALYZE_INACTIVITY_MINUTES=120
+  ANALYZE_MAX_AGE_DAYS=180
   STALLED_AFTER_MINUTES=60
   TIMEZONE=America/Sao_Paulo
   BUSINESS_HOURS_START=8

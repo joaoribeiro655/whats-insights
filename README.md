@@ -73,6 +73,8 @@ node scripts/simulate-events.mjs <instanceId> http://localhost:3000/api/ingest <
 
 **Sem IA (direto do banco):** leads novos, tempo até a primeira resposta (mediana), tempo médio de resposta, taxa de resposta, conversas paradas (lead falou por último e ficou sem retorno), % de mensagens fora do horário comercial, origem por anúncio (click to WhatsApp, com título e `ctwa_clid`).
 
+**Histórico:** no pareamento o gateway pede o histórico completo do número (`SYNC_FULL_HISTORY=true`, padrão), então as conversas antigas entram no banco e na análise. A análise começa pelas mais recentes e ignora o que for mais antigo que `ANALYZE_MAX_AGE_DAYS` (padrão 180 dias).
+
 **Com Claude (por conversa, quando ela fica `ANALYZE_INACTIVITY_MINUTES` sem mensagem nova):** score do lead (0 a 100), etapa do funil, intenção, interesse, urgência, orçamento citado, objeções, motivo de perda, sentimento, resumo, próximo passo, follow up recomendado, nota do atendimento (0 a 100), pontos fortes e melhorias concretas, se qualificou e se tentou fechar. O prompt usa o **contexto comercial** (produto, ticket, script) que você preenche em Configurações.
 
 Modelo padrão: `claude-opus-5-5` (troca em Configurações ou por `ANTHROPIC_MODEL`). A análise usa saída estruturada (Zod) e cache de prompt no system prompt.
