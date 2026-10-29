@@ -8,7 +8,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
-# Variáveis são lidas em runtime (env.ts usa getters), então o build não precisa delas.
+# Variáveis são lidas em runtime (env.ts usa getters). O build só precisa de um DATABASE_URL
+# de mentira pra coletar as rotas (a conexão é preguiçosa e não abre no build).
+ENV DATABASE_URL=postgres://build:build@localhost:5432/build
 RUN npm run build
 
 FROM node:22-bookworm-slim

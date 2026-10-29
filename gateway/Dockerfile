@@ -12,6 +12,5 @@ ENV NODE_ENV=production
 COPY package*.json ./
 RUN npm ci --omit=dev --no-audit --no-fund
 COPY --from=build /app/dist ./dist
-VOLUME ["/app/data"]
 EXPOSE 3100
 CMD ["node", "dist/index.js"]
