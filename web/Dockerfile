@@ -21,9 +21,7 @@ COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
 COPY --from=build /app/drizzle ./drizzle
-COPY --from=build /app/node_modules/drizzle-kit ./node_modules/drizzle-kit
 COPY --from=build /app/node_modules/drizzle-orm ./node_modules/drizzle-orm
-COPY --from=build /app/drizzle.config.ts ./drizzle.config.ts
-COPY --from=build /app/src/db/schema.ts ./src/db/schema.ts
+COPY --from=build /app/scripts/migrate.mjs ./scripts/migrate.mjs
 EXPOSE 3000
-CMD ["sh", "-c", "node node_modules/drizzle-kit/bin.cjs migrate && node server.js"]
+CMD ["sh", "-c", "node scripts/migrate.mjs && node server.js"]
