@@ -1,9 +1,9 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { and, asc, eq, lt, sql as dsql } from "drizzle-orm";
 import { z } from "zod";
 import { contacts, conversationInsights, conversations, db, messages, organizations, sellers } from "@/db";
 import { env } from "./env";
+import { anthropicClientFor } from "./settings";
 
 export const InsightSchema = z.object({
   lead: z.object({
@@ -41,8 +41,6 @@ Regras:
 - "followup_needed" deve ser true quando a última mensagem é do contato e ficou sem resposta, ou quando há uma promessa do vendedor pendente.
 - Melhorias devem ser concretas ("responder em até 10 min no primeiro contato", "perguntar prazo e orçamento antes de mandar preço"), nunca genéricas.
 - Nunca invente fatos que não estão na transcrição.`;
-
-const client = new Anthropic();
 
 function fmtDuration(s: number | null) {
   if (!s) return "";
@@ -98,8 +96,9 @@ export async function analyzeConversation(conversationId: string) {
     transcript,
   ].filter((l) => l !== "").join("\n");
 
+  const { client, model } = await anthropicClientFor(conv.orgId);
   const response = await client.messages.parse({
-    model: env.anthropicModel,
+    model,
     max_tokens: 4000,
     system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content: userPrompt }],
@@ -114,7 +113,7 @@ export async function analyzeConversation(conversationId: string) {
   const out = response.parsed_output;
 
   const values = {
-    orgId: conv.orgId, sellerId: conv.sellerId, conversationId, model: env.anthropicModel, analyzedAt: new Date(), messageCount: rows.length,
+    orgId: conv.orgId, sellerId: conv.sellerId, conversationId, model, analyzedAt: new Date(), messageCount: rows.length,
     leadScore: out.lead.score, stage: out.lead.stage, intent: out.lead.intent, interest: out.lead.interest, urgency: out.lead.urgency,
     budgetMentioned: out.lead.budget_mentioned, objections: out.lead.objections, lostReason: out.lead.lost_reason, sentiment: out.lead.sentiment,
     summary: out.summary, nextStep: out.next_step, followupNeeded: out.followup_needed, followupSuggestion: out.followup_suggestion,

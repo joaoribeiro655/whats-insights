@@ -7,6 +7,9 @@ export const organizations = pgTable("organizations", {
   name: text("name").notNull(),
   /** contexto comercial usado no prompt de análise: produto, ticket, script, etapas */
   salesContext: text("sales_context"),
+  /** chave da Anthropic criptografada (AES-GCM com APP_SECRET) */
+  anthropicApiKeyEnc: text("anthropic_api_key_enc"),
+  anthropicModel: text("anthropic_model"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

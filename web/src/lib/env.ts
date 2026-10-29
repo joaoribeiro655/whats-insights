@@ -10,6 +10,8 @@ export const env = {
   get gatewayToken() { return req("GATEWAY_TOKEN"); },
   get ingestSecret() { return req("INGEST_SECRET"); },
   get jobsSecret() { return req("JOBS_SECRET"); },
+  /** chave que criptografa segredos salvos no banco (ex: chave da Anthropic). Cai no INGEST_SECRET se não definida. */
+  get appSecret() { return process.env.APP_SECRET ?? req("INGEST_SECRET"); },
   get anthropicModel() { return process.env.ANTHROPIC_MODEL ?? "claude-opus-5-5"; },
   /** minutos sem mensagem nova pra considerar a conversa "assentada" e analisar */
   get analyzeInactivityMinutes() { return Number(process.env.ANALYZE_INACTIVITY_MINUTES ?? 120); },

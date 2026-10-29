@@ -17,7 +17,8 @@ WhatsApp do vendedor ──QR──▶ gateway/ (Node + Baileys, 1 sessão por v
 | Pasta | O que é |
 |---|---|
 | `gateway/` | Serviço Node de vida longa. Mantém o socket do Baileys, gera o QR como PNG, persiste a sessão em disco, reconecta com backoff e entrega eventos ao backend. Expõe uma API HTTP mínima protegida por token. |
-| `web/` | Next.js App Router + Drizzle + Postgres. Recebe os eventos, calcula métricas (tempo de resposta, conversas paradas, horário comercial, origem por anúncio) e roda a análise com Claude. |
+| `web/` | Next.js App Router + Drizzle + Postgres. Recebe os eventos, calcula métricas (tempo de resposta, conversas paradas, horário comercial, origem por anúncio), roda a análise com Claude e tem a tela de Configurações (chave da API, modelo, contexto comercial). |
+| `docs/DEPLOY-COWORK.md` | Prompt pronto pra pedir ao Claude Cowork fazer o deploy no VPS do zero. |
 | `scripts/simulate-events.mjs` | Simula o gateway mandando eventos assinados pro `/api/ingest` (útil pra desenvolver sem WhatsApp). |
 
 ## Garantias de "somente leitura"
@@ -30,7 +31,7 @@ WhatsApp do vendedor ──QR──▶ gateway/ (Node + Baileys, 1 sessão por v
 ## Rodando com Docker (produção simples)
 
 ```bash
-cp .env.example .env   # gere GATEWAY_TOKEN, INGEST_SECRET e JOBS_SECRET com: openssl rand -hex 32
+cp .env.example .env   # gere GATEWAY_TOKEN, INGEST_SECRET, JOBS_SECRET e APP_SECRET com: openssl rand -hex 32
 docker compose up -d --build
 ```
 
@@ -67,9 +68,9 @@ node scripts/simulate-events.mjs <instanceId> http://localhost:3000/api/ingest <
 
 **Sem IA (direto do banco):** leads novos, tempo até a primeira resposta (mediana), tempo médio de resposta, taxa de resposta, conversas paradas (lead falou por último e ficou sem retorno), % de mensagens fora do horário comercial, origem por anúncio (click to WhatsApp, com título e `ctwa_clid`).
 
-**Com Claude (por conversa, quando ela fica `ANALYZE_INACTIVITY_MINUTES` sem mensagem nova):** score do lead (0 a 100), etapa do funil, intenção, interesse, urgência, orçamento citado, objeções, motivo de perda, sentimento, resumo, próximo passo, follow up recomendado, nota do atendimento (0 a 100), pontos fortes e melhorias concretas, se qualificou e se tentou fechar. O prompt usa o campo `organizations.sales_context` (produto, ticket, script) se você preencher.
+**Com Claude (por conversa, quando ela fica `ANALYZE_INACTIVITY_MINUTES` sem mensagem nova):** score do lead (0 a 100), etapa do funil, intenção, interesse, urgência, orçamento citado, objeções, motivo de perda, sentimento, resumo, próximo passo, follow up recomendado, nota do atendimento (0 a 100), pontos fortes e melhorias concretas, se qualificou e se tentou fechar. O prompt usa o **contexto comercial** (produto, ticket, script) que você preenche em Configurações.
 
-Modelo padrão: `claude-opus-5-5` (`ANTHROPIC_MODEL` troca). A análise usa saída estruturada (Zod) e cache de prompt no system prompt.
+Modelo padrão: `claude-opus-5-5` (troca em Configurações ou por `ANTHROPIC_MODEL`). A análise usa saída estruturada (Zod) e cache de prompt no system prompt.
 
 ## Variáveis de ambiente
 
