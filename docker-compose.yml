@@ -1,0 +1,74 @@
+# Sobe tudo: Postgres, gateway (Baileys, somente leitura), web (Next.js) e o scheduler das análises.
+# 1. cp .env.example .env e preencha os segredos.
+# 2. docker compose up -d --build
+# 3. abra http://localhost:3000/vendedores, adicione um vendedor e leia o QR no celular dele.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: whats_insights
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  gateway:
+    build: ./gateway
+    restart: unless-stopped
+    environment:
+      PORT: 3100
+      GATEWAY_TOKEN: ${GATEWAY_TOKEN}
+      INGEST_URL: http://web:3000/api/ingest
+      INGEST_SECRET: ${INGEST_SECRET}
+      DATA_DIR: /app/data
+      DEVICE_NAME: ${DEVICE_NAME:-Insights}
+      SYNC_FULL_HISTORY: ${SYNC_FULL_HISTORY:-false}
+      LOG_LEVEL: info
+    volumes:
+      - gateway-sessions:/app/data   # sessões do WhatsApp: sem isso, todo deploy pede QR de novo
+    # Não exponha a porta publicamente: só o web precisa falar com o gateway.
+
+  web:
+    build: ./web
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/whats_insights
+      GATEWAY_URL: http://gateway:3100
+      GATEWAY_TOKEN: ${GATEWAY_TOKEN}
+      INGEST_SECRET: ${INGEST_SECRET}
+      JOBS_SECRET: ${JOBS_SECRET}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-opus-5-5}
+      ANALYZE_INACTIVITY_MINUTES: ${ANALYZE_INACTIVITY_MINUTES:-120}
+      STALLED_AFTER_MINUTES: ${STALLED_AFTER_MINUTES:-60}
+      TIMEZONE: ${TIMEZONE:-America/Sao_Paulo}
+      BUSINESS_HOURS_START: ${BUSINESS_HOURS_START:-8}
+      BUSINESS_HOURS_END: ${BUSINESS_HOURS_END:-18}
+      RETENTION_DAYS: ${RETENTION_DAYS:-180}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+
+  # Dispara a análise das conversas pendentes a cada 10 min (troque por Vercel Cron / cron do VPS se preferir).
+  scheduler:
+    image: curlimages/curl:8.10.1
+    restart: unless-stopped
+    depends_on: [web]
+    environment:
+      JOBS_SECRET: ${JOBS_SECRET}
+    command: >
+      sh -c 'while true; do
+        curl -s -X POST -H "authorization: Bearer $$JOBS_SECRET" http://web:3000/api/jobs/analyze || true;
+        echo; sleep 600;
+      done'
+
+volumes:
+  pgdata:
+  gateway-sessions:
