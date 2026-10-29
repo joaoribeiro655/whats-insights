@@ -1,72 +1,84 @@
 # Prompt pra colar no Claude Cowork
 
-Copie tudo abaixo da linha e cole no Cowork. Ele foi escrito pra quem não é técnico: o Cowork faz o máximo sozinho e pede uma coisa de cada vez. O servidor é o plano gratuito permanente da Oracle Cloud (Always Free), então o único custo é a API da Anthropic, por uso e opcional.
+Copie tudo abaixo da linha e cole no Cowork. Modelo de hospedagem igual ao gateway do ALVRZ CRM: Railway, direto do GitHub, sem servidor pra administrar. Escrito pra quem não é técnico.
 
 ---
 
-Você vai colocar em produção a plataforma WhatsApp Insights, que está no repositório GitHub joaoribeiro655/whats-insights. Leia o README.md e o docker-compose.yml do repositório antes de começar.
+Você vai colocar em produção a plataforma WhatsApp Insights, que está no repositório GitHub joaoribeiro655/whats-insights, usando o Railway (railway.com), do mesmo jeito que o gateway do meu CRM já roda lá. Leia o README.md do repositório antes de começar.
 
-Importante sobre mim: eu não sou técnico. Nunca usei servidor, SSH, Docker nem terminal. Então:
-- Faça você mesmo tudo que for possível (no navegador, no terminal do meu computador e por SSH no servidor).
+Importante sobre mim: eu não sou técnico. Então:
+- Faça você mesmo tudo que for possível, de preferência pelo navegador no painel do Railway (ou pela CLI do Railway no meu computador, se for mais rápido).
 - Quando precisar de mim, peça UMA coisa de cada vez, explique em uma frase o que é e por que precisa, e diga exatamente onde clicar ou o que copiar e colar.
 - Não me pergunte decisões técnicas: decida você e me conte o que escolheu.
 - Se algo der erro, resolva sozinho antes de me chamar.
-- Eu não quero pagar servidor. Use só o que é gratuito pra sempre na Oracle Cloud (Always Free). O único gasto aceito é a API da Anthropic, por uso.
-- No final me entregue um resumo simples: o link da plataforma, usuário e senha, e o que fazer no dia a dia.
+- No final me entregue um resumo simples: o link da plataforma, a senha de acesso e o que fazer no dia a dia.
 
-O que é o projeto: um Docker Compose com 4 serviços: db (Postgres), gateway (Node + Baileys, lê o WhatsApp dos vendedores por QR code, somente leitura, nunca envia mensagem), web (Next.js, dashboard na porta 3000) e scheduler (dispara as análises com Claude). Precisa rodar num servidor ligado 24h. Todas as imagens são multi arquitetura e o Baileys usa WebAssembly, então roda em ARM sem ajuste.
+O que é o projeto: três peças que rodam no Railway: um banco Postgres, o serviço gateway (pasta gateway, Node + Baileys, lê o WhatsApp dos vendedores por QR code, somente leitura, nunca envia mensagem) e o serviço web (pasta web, Next.js, o painel). O web já tem login por senha única e já roda sozinho as análises com Claude a cada 10 minutos, então não precisa de cron nem de proxy na frente.
 
-ETAPA 1. Criar o servidor gratuito na Oracle Cloud
-1. Gere uma chave SSH no meu computador com ssh-keygen -t ed25519 (sem senha na chave). Você vai colar a chave pública na Oracle no passo 3.
-2. Me guie pra criar a conta em cloud.oracle.com (botão "Start for free"). Região inicial (home region): Brazil East (Sao Paulo). Essa escolha não muda depois. A Oracle pede cartão de crédito só pra validar identidade e faz uma cobrança temporária pequena que é estornada; o plano Always Free não cobra nada enquanto só usarmos recursos gratuitos. Me avise quando eu precisar digitar o cartão ou confirmar e-mail. Se o cartão for recusado, me peça pra tentar outro cartão ou tentar de novo mais tarde (é comum).
-3. Depois de logado, crie uma instância (Compute → Instances → Create instance) com estas configurações:
-   - Image: Canonical Ubuntu 24.04 (a versão aarch64 aparece sozinha ao escolher o shape ARM).
-   - Shape: Ampere, VM.Standard.A1.Flex, 2 OCPUs e 12 GB de memória (fica dentro do limite gratuito de 4 OCPUs e 24 GB). Confirme que o shape está marcado como "Always Free eligible".
-   - Boot volume: 50 GB.
-   - Networking: deixar criar a VCN e subnet novas, com IP público (Assign a public IPv4 address).
-   - SSH keys: colar a chave pública gerada no passo 1.
-   - Se aparecer o erro "Out of host capacity" ao criar: tente outro Availability Domain, e se continuar, tente de novo a cada 15 ou 30 minutos (a capacidade ARM gratuita libera ao longo do dia). Se depois de várias tentativas não der, me explique a opção de mudar a conta pra "Pay As You Go" (continua sem cobrar os recursos Always Free, só libera capacidade) e me deixe decidir.
-4. Anote o IP público da instância. O usuário de SSH é ubuntu.
+ETAPA 1. Conta e projeto no Railway
+- Eu já tenho conta no Railway (é onde roda o gateway do meu CRM). Me peça pra entrar em railway.com e confirmar que estou logado. Se o plano for o trial, me avise que o crédito acaba e que o plano Hobby custa 5 dólares por mês com 5 dólares de uso incluídos, o que cobre esta plataforma com folga.
+- Crie um projeto novo chamado whats-insights. Não mexa no projeto do CRM.
+- Conecte o repositório GitHub joaoribeiro655/whats-insights ao Railway (se o Railway não enxergar o repo, me guie pra autorizar o Railway GitHub App no repositório em github.com/settings/installations).
 
-ETAPA 2. Preparar o servidor (você faz por SSH, eu não preciso fazer nada)
-- Entre com ssh ubuntu@IP e use sudo pra tudo.
-- sudo apt update && sudo apt upgrade -y
-- Crie 4 GB de swap (fallocate, mkswap, swapon e entrada no /etc/fstab) pra o build do Next.js não ficar sem memória.
-- Instale Docker pelo script oficial (curl -fsSL https://get.docker.com | sh), adicione o usuário ubuntu ao grupo docker e confirme docker compose version.
-- Abra as portas 80 e 443 nos DOIS firewalls da Oracle, senão o site não abre:
-  a) No painel da Oracle: Networking → Virtual Cloud Networks → sua VCN → Security Lists → Default Security List → Add Ingress Rules: origem 0.0.0.0/0, protocolo TCP, porta de destino 80; repita pra 443.
-  b) Dentro do servidor, a imagem Ubuntu da Oracle vem com iptables bloqueando tudo exceto 22. Rode: sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT e o mesmo pra 443, depois sudo netfilter-persistent save (instale iptables-persistent se não existir). Não abra a porta 3000.
-- Instale git. O repositório é privado, então clone com um token: me guie pra criar um Personal Access Token (classic) em github.com/settings/tokens com escopo repo, eu te colo o token, e você clona em /opt/whats-insights usando https://TOKEN@github.com/joaoribeiro655/whats-insights. Deixe a URL com token no remote pra git pull funcionar no futuro e dê permissão da pasta pro usuário ubuntu.
+ETAPA 2. Banco de dados
+- No projeto, clique em + New → Database → PostgreSQL. Espere ficar verde. Ele cria sozinho a variável DATABASE_URL que os outros serviços vão referenciar.
 
-ETAPA 3. Configurar
-- cp .env.example .env dentro de /opt/whats-insights.
-- Gere quatro segredos diferentes com openssl rand -hex 32 e preencha GATEWAY_TOKEN, INGEST_SECRET, JOBS_SECRET e APP_SECRET. Gere também uma senha forte pra POSTGRES_PASSWORD.
-- Deixe ANTHROPIC_API_KEY vazio. A chave vai ser colada na tela Configurações da própria plataforma depois.
-- TIMEZONE=America/Sao_Paulo, BUSINESS_HOURS_START=8, BUSINESS_HOURS_END=18. Me pergunte, de forma simples, qual é o horário de atendimento da minha equipe e ajuste.
-- DEVICE_NAME é o nome que vai aparecer em "Dispositivos conectados" no celular dos vendedores. Me pergunte o nome da minha empresa e use ele.
+ETAPA 3. Serviço gateway
+- + New → GitHub Repo → joaoribeiro655/whats-insights. Renomeie o serviço pra gateway.
+- Settings → Source → Root Directory: gateway. O Railway detecta o Dockerfile sozinho.
+- Settings → Networking: NÃO gere domínio público. O gateway só conversa com o web pela rede privada.
+- Volume: clique com o botão direito no serviço (ou Settings → Volumes) → Add Volume → mount path /app/data. Isso guarda as conexões do WhatsApp; sem isso cada deploy pede QR de novo.
+- Variables (gere os segredos com openssl rand -hex 32 ou com um gerador de senha, cada um diferente, e anote porque o web usa os mesmos):
+  PORT=3100
+  HOST=::
+  DATA_DIR=/app/data
+  GATEWAY_TOKEN=<segredo 1>
+  INGEST_SECRET=<segredo 2>
+  INGEST_URL=http://web.railway.internal:3000/api/ingest
+  DEVICE_NAME=<nome da minha empresa, me pergunte>
+  SYNC_FULL_HISTORY=false
+  LOG_LEVEL=info
+  NODE_ENV=production
+- Faça o deploy e confira nos logs a linha "gateway no ar (somente leitura)".
 
-ETAPA 4. Endereço com cadeado (HTTPS) e senha de acesso
-O dashboard não tem login próprio, então precisa ficar atrás de um proxy com usuário e senha.
-- Me pergunte se eu tenho um domínio (um endereço tipo minhaempresa.com.br). Se eu tiver, me explique como criar um registro A chamado insights apontando pro IP do servidor no painel onde comprei o domínio, e espere eu confirmar. Se eu não tiver ou não souber, use IP.sslip.io como endereço (ex: 203.0.113.10.sslip.io), que funciona sem comprar nada.
-- Suba um Caddy em Docker (adicione um serviço caddy no docker-compose.yml, portas 80 e 443, volumes caddy_data e caddy_config) fazendo reverse proxy pra web:3000 com HTTPS automático.
-- Proteja com basic_auth no Caddyfile. Gere a senha com caddy hash-password. Usuário admin e uma senha forte que você vai me entregar no final.
-- A rota /api/ingest é chamada pelo gateway por dentro da rede Docker (http://web:3000/api/ingest) e não passa pelo Caddy, então o basic auth não atrapalha. Confirme isso lendo o compose.
+ETAPA 4. Serviço web
+- + New → GitHub Repo → joaoribeiro655/whats-insights de novo. Renomeie pra web.
+- Settings → Source → Root Directory: web.
+- Settings → Networking → Generate Domain (porta 3000). Esse é o link do painel, com HTTPS automático.
+- Variables:
+  PORT=3000
+  HOSTNAME=::
+  NODE_ENV=production
+  DATABASE_URL=${{Postgres.DATABASE_URL}}   (use a referência ao serviço do banco; se o serviço tiver outro nome, ajuste)
+  GATEWAY_URL=http://gateway.railway.internal:3100
+  GATEWAY_TOKEN=<segredo 1, igual ao do gateway>
+  INGEST_SECRET=<segredo 2, igual ao do gateway>
+  JOBS_SECRET=<segredo 3>
+  APP_SECRET=<segredo 4>
+  DASHBOARD_PASSWORD=<senha forte que você vai me entregar>
+  ANALYZE_EVERY_MINUTES=10
+  ANALYZE_INACTIVITY_MINUTES=120
+  STALLED_AFTER_MINUTES=60
+  TIMEZONE=America/Sao_Paulo
+  BUSINESS_HOURS_START=8
+  BUSINESS_HOURS_END=18
+  RETENTION_DAYS=180
+  Me pergunte, de forma simples, o horário de atendimento da equipe e ajuste BUSINESS_HOURS. Deixe ANTHROPIC_API_KEY sem definir: a chave é colada na tela Configurações da própria plataforma.
+- Faça o deploy. O primeiro build demora alguns minutos. As migrations do banco rodam sozinhas na subida. Nos logs tem que aparecer "[scheduler] análise automática a cada 10 min".
+- Se o gateway tiver subido antes do web e estiver logando "backend indisponível, retentando", é normal: ele retenta sozinho.
 
-ETAPA 5. Subir e validar comigo
-- docker compose up -d --build e acompanhe docker compose logs -f web gateway até ver "gateway no ar" e o Next pronto. O primeiro build demora alguns minutos. As migrations do banco rodam sozinhas.
-- Me mande o link. Eu abro, coloco usuário e senha e te digo se a página Visão geral carregou.
-- Me guie pra criar a chave da API da Anthropic: entrar em console.anthropic.com, criar conta se não tiver, colocar crédito (uns 10 dólares bastam pra começar), ir em API Keys, criar uma chave e copiar (começa com sk-ant-). Depois me diga pra abrir a aba Configurações da plataforma, colar a chave, clicar em Testar chave e em Salvar. Deixe o modelo em claude-haiku-5-5 por enquanto (mais barato); eu troco pra claude-sonnet-5-5 ou claude-opus-5-5 depois se quiser análises mais profundas.
+ETAPA 5. Validar comigo
+- Me mande o link do painel. Eu abro, digito a senha e te digo se a página Visão geral carregou.
+- Me guie pra criar a chave da API da Anthropic: entrar em console.anthropic.com, criar conta se não tiver, colocar crédito (uns 10 dólares bastam pra começar), ir em API Keys, criar uma chave e copiar (começa com sk-ant-). Depois me diga pra abrir a aba Configurações da plataforma, colar a chave, clicar em Testar chave e em Salvar. Deixe o modelo em claude-haiku-5-5 (mais barato); eu troco pra claude-sonnet-5-5 ou claude-opus-5-5 depois se quiser análises mais profundas.
 - Na mesma tela tem o campo contexto comercial. Me faça 4 perguntas simples (o que vendemos, preço médio, como é o processo de venda, objeções mais comuns dos clientes) e escreva o texto pra mim, que eu colo lá.
-- Me diga pra ir em Vendedores, adicionar um vendedor de teste com meu nome e confirmar que apareceu um QR code. Se não aparecer, olhe docker compose logs gateway e resolva.
+- Me diga pra ir em Vendedores, adicionar um vendedor de teste com meu nome e confirmar que apareceu um QR code em até 20 segundos. Se não aparecer, olhe os logs do gateway e do web e resolva (o erro mais comum é GATEWAY_URL ou GATEWAY_TOKEN diferente entre os dois serviços, ou HOST/HOSTNAME sem o valor ::).
 - Me explique como ler o QR no meu WhatsApp: abrir o WhatsApp, tocar nos três pontinhos, Dispositivos conectados, Conectar dispositivo, apontar a câmera. Depois me peça pra alguém mandar 2 ou 3 mensagens pro meu número e eu responder. Confirme que a conversa apareceu em Conversas e que meu status ficou "Conectado".
 - Me diga pra abrir essa conversa e clicar em Analisar agora. Confirme que apareceu score, etapa e sugestões.
-- Confirme que o scheduler está rodando: docker compose logs scheduler deve mostrar {"ok":true,...} a cada 10 minutos.
 
-ETAPA 6. Deixar seguro pro dia a dia (você faz)
-- Backup diário do banco: cron rodando docker compose exec -T db pg_dump -U postgres whats_insights | gzip > /opt/backups/whats_insights-$(date +%F).sql.gz, mantendo os últimos 14 arquivos.
-- Confirme que os volumes pgdata e gateway-sessions existem (docker volume ls). O gateway-sessions guarda as conexões do WhatsApp; se for apagado todo mundo precisa ler o QR de novo.
-- Reinicie o servidor (sudo reboot) e confirme que tudo volta sozinho e que meu WhatsApp continua conectado sem novo QR.
-- A Oracle desliga instâncias Always Free que ficam ociosas por 7 dias (uso de CPU muito baixo). O gateway com WhatsApp conectado normalmente evita isso, mas por garantia crie um cron que roda a cada 10 minutos um pequeno trabalho de CPU por alguns segundos (por exemplo, calcular um hash de um arquivo grande). Me explique isso em uma frase.
+ETAPA 6. Garantias
+- Faça um redeploy do gateway e confirme que meu WhatsApp continua conectado sem novo QR (prova de que o volume está certo).
+- Ative backups do Postgres no Railway (no serviço do banco, aba Backups) se o plano permitir; se não permitir, me diga em uma frase.
+- Confirme que o gateway não tem domínio público e que o web pede senha antes de qualquer página.
 
 ETAPA 7. Entrega
-Me mande em linguagem simples: o link da plataforma, usuário e senha, confirmação de que o servidor é gratuito e uma estimativa do gasto mensal com a API da Anthropic, como conectar um vendedor novo, o que fazer se um vendedor desconectar, e como atualizar a plataforma quando eu pedir mudanças (cd /opt/whats-insights && git pull && docker compose up -d --build). Guarde num arquivo no meu computador chamado "WhatsApp Insights - acesso e instruções.txt". Lembre também: a conexão por QR não é a API oficial do WhatsApp. A plataforma só lê e nunca envia, mas ainda assim existe risco de bloqueio do número se a Meta detectar, então nunca usar esse número pra disparos em massa.
+Me mande em linguagem simples: o link do painel, a senha, uma estimativa do custo mensal (Railway + API da Anthropic), como conectar um vendedor novo, o que fazer se um vendedor desconectar, e como a plataforma atualiza (cada push na branch main do GitHub faz o Railway fazer deploy sozinho). Guarde num arquivo no meu computador chamado "WhatsApp Insights - acesso e instruções.txt". Lembre também: a conexão por QR não é a API oficial do WhatsApp. A plataforma só lê e nunca envia, mas ainda assim existe risco de bloqueio do número se a Meta detectar, então nunca usar esse número pra disparos em massa.

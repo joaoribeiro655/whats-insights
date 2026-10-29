@@ -28,6 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               ))}
             </nav>
             <span className="ml-auto text-xs text-zinc-400">somente leitura · nenhuma mensagem é enviada</span>
+            <form action="/api/logout" method="post"><button className="text-xs text-zinc-500 hover:underline">sair</button></form>
           </div>
         </header>
         <main className="mx-auto w-full max-w-7xl px-4 py-6 flex-1">{children}</main>

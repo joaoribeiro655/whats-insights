@@ -10,15 +10,16 @@ WhatsApp do vendedor ──QR──▶ gateway/ (Node + Baileys, 1 sessão por v
                                  ▼
                             web/ (Next.js 16)
                               ├─ POST /api/ingest        grava contatos, conversas e mensagens no Postgres
-                              ├─ POST /api/jobs/analyze  analisa conversas "assentadas" com Claude (saída estruturada)
-                              └─ dashboard               visão geral, vendedores (QR), conversas, leads
+                              ├─ agendador embutido      analisa conversas "assentadas" com Claude a cada N min
+                              ├─ POST /api/jobs/analyze  mesma análise, disparada por cron externo (opcional)
+                              └─ dashboard               visão geral, vendedores (QR), conversas, leads, configurações (senha única)
 ```
 
 | Pasta | O que é |
 |---|---|
 | `gateway/` | Serviço Node de vida longa. Mantém o socket do Baileys, gera o QR como PNG, persiste a sessão em disco, reconecta com backoff e entrega eventos ao backend. Expõe uma API HTTP mínima protegida por token. |
 | `web/` | Next.js App Router + Drizzle + Postgres. Recebe os eventos, calcula métricas (tempo de resposta, conversas paradas, horário comercial, origem por anúncio), roda a análise com Claude e tem a tela de Configurações (chave da API, modelo, contexto comercial). |
-| `docs/DEPLOY-COWORK.md` | Prompt pronto pra pedir ao Claude Cowork fazer o deploy no VPS do zero. |
+| `docs/DEPLOY-COWORK.md` | Prompt pronto pra pedir ao Claude Cowork fazer o deploy no Railway (mesmo modelo do gateway do ALVRZ CRM). |
 | `scripts/simulate-events.mjs` | Simula o gateway mandando eventos assinados pro `/api/ingest` (útil pra desenvolver sem WhatsApp). |
 
 ## Garantias de "somente leitura"
@@ -28,7 +29,11 @@ WhatsApp do vendedor ──QR──▶ gateway/ (Node + Baileys, 1 sessão por v
 - `getMessage` devolve `undefined`: nada é reenviado sob demanda.
 - A única ação de escrita no WhatsApp é o **logout** quando o gestor desconecta o vendedor pela tela.
 
-## Rodando com Docker (produção simples)
+## Rodando no Railway (recomendado, igual ao gateway do ALVRZ CRM)
+
+Um projeto com três serviços: **Postgres** (plugin do Railway), **gateway** (root directory `gateway`, volume em `/app/data`) e **web** (root directory `web`, domínio público). As variáveis estão descritas em `docs/DEPLOY-COWORK.md`. Os dois serviços precisam de `HOST=::` / `HOSTNAME=::` pra conversar pela rede privada do Railway.
+
+## Rodando com Docker (VPS)
 
 ```bash
 cp .env.example .env   # gere GATEWAY_TOKEN, INGEST_SECRET, JOBS_SECRET e APP_SECRET com: openssl rand -hex 32
@@ -37,7 +42,7 @@ docker compose up -d --build
 
 Abra `http://localhost:3000/vendedores`, adicione um vendedor e leia o QR no celular dele (WhatsApp → Dispositivos conectados → Conectar dispositivo). O volume `gateway-sessions` guarda a sessão: reiniciar não pede QR de novo, só logout pelo celular.
 
-O serviço `scheduler` chama `/api/jobs/analyze` a cada 10 min. Pode trocar por cron do VPS ou Vercel Cron:
+As análises rodam sozinhas dentro do `web` (`ANALYZE_EVERY_MINUTES`, padrão 10). Se preferir cron externo, ponha 0 e chame:
 
 ```bash
 curl -X POST -H "authorization: Bearer $JOBS_SECRET" https://seu-dominio/api/jobs/analyze
@@ -80,5 +85,5 @@ Veja `.env.example` na raiz (Docker), `web/.env.example` e `gateway/.env.example
 
 - **Banimento.** Baileys não é oficial. Só leitura reduz muito o risco, mas ele existe. Nunca use essa conexão pra disparar mensagens.
 - **LGPD.** Você armazena conversas de terceiros. Tenha consentimento do vendedor, política clara, e use `RETENTION_DAYS` (mensagens antigas são apagadas pelo job; insights e métricas ficam).
-- **Autenticação do dashboard** ainda não existe (MVP). Coloque atrás de um proxy com auth ou adicione login antes de expor na internet. Todas as tabelas já têm `org_id`, então o multi tenant é só trocar `getDefaultOrg()` pela org do usuário logado.
+- **Autenticação** é uma senha única (`DASHBOARD_PASSWORD`), checada no `proxy.ts`. Em produção sem a variável o painel bloqueia. Todas as tabelas já têm `org_id`, então usuários e multi tenant entram trocando `getDefaultOrg()` pela org do usuário logado.
 - **Baileys 7 (rc) e LID.** Contatos podem chegar primeiro como `@lid` sem telefone; a ingestão funde os registros quando o telefone aparece.
